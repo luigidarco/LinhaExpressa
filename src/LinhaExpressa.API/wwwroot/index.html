@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linha Expressa — Frota de Ônibus</title>
+  <!-- Tailwind v4 (CDN play) -->
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: {
+              50:  '#eef6ff',
+              100: '#d9eaff',
+              200: '#bcd9ff',
+              300: '#8ec0ff',
+              400: '#599cff',
+              500: '#3479f6',
+              600: '#205aeb',
+              700: '#1a47cf',
+              800: '#1a3ea7',
+              900: '#1c3883',
+            }
+          },
+          boxShadow: {
+            glow: '0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px -8px rgba(59,130,246,0.35)',
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      html { @apply bg-slate-950 text-slate-100 antialiased; }
+      body { @apply min-h-screen; }
+    }
+  </style>
+  <!-- Microsoft SignalR client -->
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+</head>
+<body class="font-sans">
+  <div class="min-h-screen flex flex-col">
+    <!-- Topbar -->
+    <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-glow">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/>
+              <circle cx="7" cy="18" r="2"/><circle cx="16" cy="18" r="2"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-base sm:text-lg font-semibold tracking-tight">Linha Expressa</h1>
+            <p class="text-xs text-slate-400 -mt-0.5">Gestão de Frota · Ônibus</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="connStatus" class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
+            <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+            Conectando…
+          </span>
+          <button onclick="openCreate()" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 hover:bg-brand-500 active:bg-brand-700 transition px-3.5 py-2 text-sm font-medium shadow-glow">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo ônibus
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="border-b border-slate-800/80 bg-slate-950">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+          <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="filtroPrefixo" type="text" placeholder="Buscar por prefixo…" class="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" />
+        </div>
+        <select id="filtroStatus" class="rounded-lg bg-slate-900 border border-slate-800 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500">
+          <option value="">Todos os status</option>
+          <option value="1">Ativo</option>
+          <option value="2">Inativo</option>
+          <option value="3">Em Manutenção</option>
+        </select>
+        <button onclick="loadList(1)" class="rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 px-3 py-2 text-sm font-medium">Filtrar</button>
+        <button onclick="resetFiltros()" class="rounded-lg px-3 py-2 text-sm text-slate-400 hover:text-slate-200">Limpar</button>
+        <div class="ml-auto text-xs text-slate-500" id="pagingInfo">—</div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <main class="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+      <!-- Toast container -->
+      <div id="toasts" class="fixed top-20 right-4 z-50 flex flex-col gap-2"></div>
+
+      <!-- Empty state -->
+      <div id="emptyState" class="hidden rounded-2xl border border-dashed border-slate-800 p-10 text-center">
+        <div class="mx-auto h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M5 6h14l1 6v6H4v-6z"/></svg>
+        </div>
+        <p class="text-slate-300 font-medium">Nenhum ônibus cadastrado</p>
+        <p class="text-sm text-slate-500 mt-1">Clique em <span class="text-slate-300">Novo ônibus</span> para começar.</p>
+      </div>
+
+      <!-- List -->
+      <div id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+      <!-- Pagination -->
+      <nav id="pagination" class="mt-6 flex items-center justify-end gap-2 text-sm"></nav>
+    </main>
+
+    <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+      Linha Expressa · CRUD de Ônibus · Tailwind v3.4 + SignalR
+    </footer>
+  </div>
+
+  <!-- Modal: Create/Edit -->
+  <div id="formModal" class="hidden fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl">
+      <div class="flex items-center justify-between p-5 border-b border-slate-800">
+        <h2 id="formTitle" class="text-lg font-semibold">Novo ônibus</h2>
+        <button onclick="closeForm()" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="form" class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4" onsubmit="submitForm(event)">
+        <input type="hidden" id="formId" />
+        <div>
+          <label class="text-xs font-medium text-slate-400">Prefixo</label>
+          <input id="fPrefixo" required maxlength="20" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" placeholder="EX: 12345" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Placa</label>
+          <input id="fPlaca" required maxlength="10" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" placeholder="ABC1D23 ou ABC-1234" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs font-medium text-slate-400">Modelo</label>
+          <input id="fModelo" required maxlength="80" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" placeholder="Ex: Paradiso 1800 DD" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Montadora</label>
+          <input id="fMontadora" required maxlength="80" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" placeholder="Ex: Mercedes-Benz" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Ano de fabricação</label>
+          <input id="fAno" type="number" required min="1950" max="2100" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Combustível</label>
+          <select id="fCombustivel" required class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500">
+            <option>Diesel</option><option>Diesel S10</option><option>Gasolina</option><option>Etanol</option><option>GNV</option><option>Elétrico</option><option>Híbrido</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Capacidade (passageiros)</label>
+          <input id="fCapacidade" type="number" required min="1" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Km atual</label>
+          <input id="fKm" type="number" min="0" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500" value="0" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-400">Fonte do KM</label>
+          <select id="fFonte" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500">
+            <option value="1">Odômetro</option><option value="2">Tacógrafo</option><option value="3">Manual</option>
+          </select>
+        </div>
+        <div id="formError" class="sm:col-span-2 hidden text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2"></div>
+        <div class="sm:col-span-2 flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeForm()" class="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">Cancelar</button>
+          <button type="submit" class="rounded-lg bg-brand-600 hover:bg-brand-500 px-4 py-2 text-sm font-medium shadow-glow">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Confirm Delete -->
+  <div id="deleteModal" class="hidden fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6">
+      <div class="flex items-start gap-3">
+        <div class="h-10 w-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center flex-shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-base font-semibold">Inativar ônibus?</h3>
+          <p class="text-sm text-slate-400 mt-1">Esta ação é um <b>soft delete</b>: o veículo não será removido, apenas marcado como <b>Inativo</b>. O histórico será preservado.</p>
+        </div>
+      </div>
+      <div class="mt-5 flex items-center justify-end gap-2">
+        <button onclick="closeDelete()" class="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">Cancelar</button>
+        <button id="confirmDeleteBtn" class="rounded-lg bg-red-600 hover:bg-red-500 px-4 py-2 text-sm font-medium">Inativar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Configuração de ambiente ---
+    const API = location.origin; // mesma origem do backend
+    let currentPage = 1;
+    let totalPages = 1;
+    let deletingId = null;
+
+    // --- Helpers ---
+    const fmt = {
+      km: n => (n ?? 0).toLocaleString('pt-BR'),
+      date: d => d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—',
+    };
+
+    function statusBadge(s) {
+      const map = {
+        1: { label: 'Ativo', cls: 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20' },
+        2: { label: 'Inativo', cls: 'bg-slate-500/10 text-slate-300 ring-1 ring-slate-500/20' },
+        3: { label: 'Em Manutenção', cls: 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20' },
+      };
+      const v = map[s] || map[2];
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${v.cls}">${v.label}</span>`;
+    }
+
+    function toast(message, type = 'info') {
+      const colors = {
+        success: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30',
+        error: 'bg-red-500/15 text-red-200 border-red-500/30',
+        info: 'bg-brand-500/15 text-brand-200 border-brand-500/30',
+      };
+      const el = document.createElement('div');
+      el.className = `min-w-[240px] max-w-sm px-4 py-3 rounded-lg border text-sm shadow-lg backdrop-blur ${colors[type]}`;
+      el.textContent = message;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 3500);
+      setTimeout(() => el.remove(), 4000);
+    }
+
+    // --- API calls ---
+    async function loadList(page = 1) {
+      currentPage = page;
+      const status = document.getElementById('filtroStatus').value;
+      const prefixo = document.getElementById('filtroPrefixo').value;
+      const params = new URLSearchParams({ page, pageSize: 12 });
+      if (status) params.set('status', status);
+      if (prefixo) params.set('prefixo', prefixo);
+
+      const res = await fetch(`${API}/onibus?${params}`);
+      if (!res.ok) { toast('Falha ao carregar a lista.', 'error'); return; }
+      const data = await res.json();
+      totalPages = data.totalPages || 1;
+      renderCards(data.items || []);
+      renderPaging(data);
+      document.getElementById('pagingInfo').textContent =
+        data.totalItems ? `${data.totalItems} ônibus · página ${data.page} de ${data.totalPages}` : 'Nenhum resultado';
+    }
+
+    function renderCards(items) {
+      const wrap = document.getElementById('cards');
+      const empty = document.getElementById('emptyState');
+      if (!items.length) { wrap.innerHTML = ''; empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+      wrap.innerHTML = items.map(o => `
+        <article class="rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition p-5 flex flex-col gap-4">
+          <header class="flex items-start justify-between">
+            <div>
+              <div class="text-xs font-medium text-slate-500">Prefixo</div>
+              <div class="text-lg font-semibold tracking-tight">${o.prefixo}</div>
+            </div>
+            ${statusBadge(o.status)}
+          </header>
+          <dl class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt class="text-xs text-slate-500">Placa</dt>
+              <dd class="font-medium">${o.placa}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Ano</dt>
+              <dd class="font-medium">${o.anoFabricacao}</dd>
+            </div>
+            <div class="col-span-2">
+              <dt class="text-xs text-slate-500">Modelo</dt>
+              <dd class="font-medium">${o.modelo} <span class="text-slate-400">· ${o.montadora}</span></dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Capacidade</dt>
+              <dd class="font-medium">${o.capacidadePassageiros} pass.</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Combustível</dt>
+              <dd class="font-medium">${o.combustivel}</dd>
+            </div>
+            <div class="col-span-2 pt-2 mt-1 border-t border-slate-800 flex items-center justify-between">
+              <div>
+                <dt class="text-xs text-slate-500">Km atual</dt>
+                <dd class="font-medium tabular-nums">${fmt.km(o.kmAtual)} <span class="text-slate-500 text-xs">(${fonteLabel(o.fonteKm)})</span></dd>
+              </div>
+              <div class="text-[11px] text-slate-500 text-right">
+                Atualizado<br>${fmt.date(o.atualizadoEm)}
+              </div>
+            </div>
+          </dl>
+          <footer class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onclick='openEdit(${JSON.stringify(o)})' class="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800">Editar</button>
+            <button onclick='openDelete("${o.id}")' class="rounded-lg px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10">Inativar</button>
+          </footer>
+        </article>
+      `).join('');
+    }
+
+    function fonteLabel(f) {
+      return ({ 1: 'odômetro', 2: 'tacógrafo', 3: 'manual' })[f] || 'odômetro';
+    }
+
+    function renderPaging(data) {
+      const nav = document.getElementById('pagination');
+      if (!data.totalItems) { nav.innerHTML = ''; return; }
+      const prev = `<button ${data.page <= 1 ? 'disabled' : ''} onclick="loadList(${data.page - 1})" class="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs disabled:opacity-40">Anterior</button>`;
+      const next = `<button ${data.page >= data.totalPages ? 'disabled' : ''} onclick="loadList(${data.page + 1})" class="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs disabled:opacity-40">Próxima</button>`;
+      nav.innerHTML = prev + next;
+    }
+
+    // --- Form ---
+    function openCreate() {
+      document.getElementById('formTitle').textContent = 'Novo ônibus';
+      document.getElementById('formId').value = '';
+      ['fPrefixo','fPlaca','fModelo','fMontadora'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('fAno').value = new Date().getFullYear();
+      document.getElementById('fCapacidade').value = 44;
+      document.getElementById('fKm').value = 0;
+      document.getElementById('fFonte').value = 1;
+      document.getElementById('fPrefixo').disabled = false;
+      document.getElementById('fPlaca').disabled = false;
+      document.getElementById('formError').classList.add('hidden');
+      document.getElementById('formModal').classList.remove('hidden');
+    }
+    function openEdit(o) {
+      document.getElementById('formTitle').textContent = `Editar — ${o.prefixo}`;
+      document.getElementById('formId').value = o.id;
+      document.getElementById('fPrefixo').value = o.prefixo;
+      document.getElementById('fPlaca').value = o.placa;
+      document.getElementById('fModelo').value = o.modelo;
+      document.getElementById('fMontadora').value = o.montadora;
+      document.getElementById('fAno').value = o.anoFabricacao;
+      document.getElementById('fCombustivel').value = o.combustivel;
+      document.getElementById('fCapacidade').value = o.capacidadePassageiros;
+      document.getElementById('fKm').value = o.kmAtual;
+      document.getElementById('fFonte').value = o.fonteKm;
+      document.getElementById('fPrefixo').disabled = true;
+      document.getElementById('fPlaca').disabled = true;
+      document.getElementById('formError').classList.add('hidden');
+      document.getElementById('formModal').classList.remove('hidden');
+    }
+    function closeForm() { document.getElementById('formModal').classList.add('hidden'); }
+
+    async function submitForm(ev) {
+      ev.preventDefault();
+      const id = document.getElementById('formId').value;
+      const errBox = document.getElementById('formError');
+      errBox.classList.add('hidden');
+
+      const body = {
+        prefixo: document.getElementById('fPrefixo').value.trim(),
+        placa: document.getElementById('fPlaca').value.trim().toUpperCase(),
+        modelo: document.getElementById('fModelo').value.trim(),
+        montadora: document.getElementById('fMontadora').value.trim(),
+        anoFabricacao: parseInt(document.getElementById('fAno').value, 10),
+        combustivel: document.getElementById('fCombustivel').value,
+        capacidadePassageiros: parseInt(document.getElementById('fCapacidade').value, 10),
+        kmAtual: parseInt(document.getElementById('fKm').value, 10) || 0,
+        fonteKm: parseInt(document.getElementById('fFonte').value, 10),
+      };
+
+      let url, method;
+      if (id) {
+        // PUT só envia campos editáveis
+        url = `${API}/onibus/${id}`;
+        method = 'PUT';
+      } else {
+        url = `${API}/onibus`;
+        method = 'POST';
+      }
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        errBox.textContent = err.error || `Erro ${res.status}`;
+        errBox.classList.remove('hidden');
+        return;
+      }
+      closeForm();
+      toast(id ? 'Ônibus atualizado.' : 'Ônibus criado.', 'success');
+      await loadList(id ? currentPage : 1);
+    }
+
+    // --- Delete ---
+    function openDelete(id) { deletingId = id; document.getElementById('deleteModal').classList.remove('hidden'); }
+    function closeDelete() { deletingId = null; document.getElementById('deleteModal').classList.add('hidden'); }
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+      if (!deletingId) return;
+      const res = await fetch(`${API}/onibus/${deletingId}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 204) {
+        const err = await res.json().catch(() => ({}));
+        toast(err.error || 'Erro ao inativar.', 'error');
+      } else {
+        toast('Ônibus inativado (soft delete).', 'success');
+      }
+      closeDelete();
+      await loadList(currentPage);
+    });
+
+    function resetFiltros() {
+      document.getElementById('filtroStatus').value = '';
+      document.getElementById('filtroPrefixo').value = '';
+      loadList(1);
+    }
+
+    // --- SignalR ---
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl(`${API}/hubs/frota`)
+      .withAutomaticReconnect()
+      .build();
+
+    const statusEl = document.getElementById('connStatus');
+    const setStatus = (txt, color) => {
+      statusEl.innerHTML = `<span class="h-1.5 w-1.5 rounded-full bg-${color}-400"></span> ${txt}`;
+    };
+
+    conn.on('OnibusCreated', o => { toast(`Novo ônibus cadastrado: ${o.prefixo}`, 'info'); loadList(currentPage); });
+    conn.on('OnibusUpdated', o => { toast(`Ônibus atualizado: ${o.prefixo}`, 'info'); loadList(currentPage); });
+    conn.on('OnibusDeleted', id => { toast(`Ônibus inativado.`, 'info'); loadList(currentPage); });
+
+    conn.start()
+      .then(async () => {
+        statusEl.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20';
+        setStatus('Tempo real', 'emerald');
+        await conn.invoke('EntrarGrupoGestores');
+        await conn.invoke('EntrarGrupoDespachantes');
+      })
+      .catch(() => {
+        statusEl.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/10 text-red-300 ring-1 ring-red-500/20';
+        setStatus('Offline', 'red');
+      });
+    conn.onreconnecting(() => { statusEl.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20'; setStatus('Reconectando…', 'amber'); });
+    conn.onreconnected(() => { statusEl.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20'; setStatus('Tempo real', 'emerald'); });
+    conn.onclose(() => { statusEl.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/10 text-red-300 ring-1 ring-red-500/20'; setStatus('Offline', 'red'); });
+
+    // --- Bootstrap ---
+    document.getElementById('filtroPrefixo').addEventListener('keydown', e => { if (e.key === 'Enter') loadList(1); });
+    loadList(1);
+  </script>
+</body>
+</html>
