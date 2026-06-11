@@ -1,0 +1,54 @@
+services:
+  db:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: linhaexpressa-db
+    environment:
+      ACCEPT_EULA: "1"
+      MSSQL_SA_PASSWORD: "LinhaExpress@2026"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - linhaexpressa-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  migrate:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: linhaexpressa-migrate
+    working_dir: /src
+    volumes:
+      - .:/src
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=LinhaExpressa;User Id=sa;Password=LinhaExpress@2026;TrustServerCertificate=True;MultipleActiveResultSets=true"
+    command: >
+      sh -c "dotnet tool install -g dotnet-ef --version 8.0.10
+             && export PATH=\"\$$PATH:/root/.dotnet/tools\"
+             && dotnet ef database update --project src/LinhaExpressa.Infrastructure --startup-project src/LinhaExpressa.API"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linhaexpressa-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=LinhaExpressa;User Id=sa;Password=LinhaExpress@2026;TrustServerCertificate=True;MultipleActiveResultSets=true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  linhaexpressa-data:
